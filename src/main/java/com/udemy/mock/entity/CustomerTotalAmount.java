@@ -15,14 +15,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "mock_cart")
-public class Cart extends Auditing<String> {
+@Table(name = "mock_customer_total_amount")
+public class CustomerTotalAmount extends Auditing<String> {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long itemId;
     private Long customerId;
-    private Integer price;
-    private Integer quantity;
+    private Integer total;
 }
