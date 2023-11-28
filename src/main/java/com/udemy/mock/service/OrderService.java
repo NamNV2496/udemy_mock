@@ -21,10 +21,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -77,13 +79,16 @@ public class OrderService {
         }
 
         if (Objects.equals(orderOptional.get().getStatus(), status)) {
+            log.info("Trạng thái mới trùng với trạng thái hiện tại");
             return false;
         }
         Order orderUpdate = new Order();
         BeanUtils.copyProperties(orderOptional.get(), orderUpdate);
+
+        // CREATED -> PAID, PAID -> COMPLETED
         if (!(OrderStatus.isCreatedStatus(orderUpdate.getStatus())
             && OrderStatus.isPaidStatus(status))
-            || !(OrderStatus.isPaidStatus(orderUpdate.getStatus())
+            && !(OrderStatus.isPaidStatus(orderUpdate.getStatus())
             && OrderStatus.isCompleteStatus(status))) {
             throw new RuntimeException("Status is invalid");
         }

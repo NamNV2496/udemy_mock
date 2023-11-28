@@ -36,7 +36,7 @@ public class CalculateTotalNAVScheduler {
     private final ItemHistoryRepository itemHistoryRepository;
     private final CustomerTotalAmountRepository customerTotalAmountRepository;
 
-    //    @Scheduled(cron = "* 5 5 * * *")
+//        @Scheduled(cron = "* 5 5 * * *")
     @Transactional
     public void jobNav() {
 
@@ -47,7 +47,7 @@ public class CalculateTotalNAVScheduler {
         List<CustomerTotalAmount> customerTotalAmountList = customerTotalAmountRepository.findAll();
         Map<Long, CustomerTotalAmount> customerIdMap = customerTotalAmountList.stream()
             .collect(Collectors.toMap(CustomerTotalAmount::getCustomerId, Function.identity()));
-        Map<Long, Integer> totalNavTodayOfCustId = this.getTotalNav();
+        Map<Long, Integer> totalNavTodayOfCustId = this.getTotalNavToday();
         List<CustomerTotalAmount> updateList = this.addTotalToday(totalNavTodayOfCustId, customerIdMap);
 
         // update customerRank
@@ -57,7 +57,7 @@ public class CalculateTotalNAVScheduler {
         customerTotalAmountRepository.saveAll(updateList);
     }
 
-    private Map<Long, Integer> getTotalNav() {
+    private Map<Long, Integer> getTotalNavToday() {
 
         Map<Long, Integer> totalNavTodayOfCustId = new HashMap<>();
         List<OrderHistory> orderHistoryList = orderHistoryRepository.findByOrderDateBetween(
@@ -72,8 +72,7 @@ public class CalculateTotalNAVScheduler {
                 .mapToInt(itemHistory -> itemHistory.getPrice() * itemHistory.getQuantity()).sum();
             Long custId = orderHistory.getCustomerId();
             if (totalNavTodayOfCustId.containsKey(custId)) {
-                totalNavTodayOfCustId.put(custId,
-                    totalNavTodayOfCustId.get(custId) + total);
+                totalNavTodayOfCustId.put(custId, totalNavTodayOfCustId.get(custId) + total);
             } else {
                 totalNavTodayOfCustId.put(custId, total);
             }
@@ -156,20 +155,20 @@ public class CalculateTotalNAVScheduler {
         Map<Long, Customer> customerMap = customers.stream()
             .collect(Collectors.toMap(Customer::getId, Function.identity()));
         for (Map.Entry<Long, Integer> entry : totalAmountOfAccount.entrySet()) {
-            if (entry.getValue() > 1000000
-                && customerMap.get(entry.getKey()).getCustomerRank() != 2) {
-                Customer customerUpdate = new Customer();
-                BeanUtils.copyProperties(customerMap.get(entry.getKey()), customerUpdate);
-                customerUpdate.setCustomerRank(2);
-                customerUpdateList.add(customerUpdate);
-                listUpgradeRank2.put(customerUpdate.getId(), customerUpdate.getUserName());
-            } else if (entry.getValue() > 5000000
+            if (entry.getValue() > 5000000
                 && customerMap.get(entry.getKey()).getCustomerRank() != 3) {
                 Customer customerUpdate = new Customer();
                 BeanUtils.copyProperties(customerMap.get(entry.getKey()), customerUpdate);
                 customerUpdate.setCustomerRank(3);
                 customerUpdateList.add(customerUpdate);
                 listUpgradeRank3.put(customerUpdate.getId(), customerUpdate.getUserName());
+            } else if (entry.getValue() > 1000000
+                && customerMap.get(entry.getKey()).getCustomerRank() != 2) {
+                Customer customerUpdate = new Customer();
+                BeanUtils.copyProperties(customerMap.get(entry.getKey()), customerUpdate);
+                customerUpdate.setCustomerRank(2);
+                customerUpdateList.add(customerUpdate);
+                listUpgradeRank2.put(customerUpdate.getId(), customerUpdate.getUserName());
             }
         }
 

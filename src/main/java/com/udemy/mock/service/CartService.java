@@ -33,8 +33,8 @@ public class CartService {
         }
         List<Cart> cart = cartRepository.findByCustomerId(customerId);
         Map<Long, Cart> cartMap = cart.stream().collect(Collectors.toMap(Cart::getItemId, Function.identity()));
-        List<Long> cartIds = cart.stream().map(Cart::getItemId).collect(Collectors.toList());
-        List<Item> itemList = itemRepository.findByIdIn(cartIds);
+        List<Long> itemIds = cart.stream().map(Cart::getItemId).collect(Collectors.toList());
+        List<Item> itemList = itemRepository.findByIdIn(itemIds);
 
         CartResponse response = new CartResponse();
         List<ItemResponse> items = new ArrayList<>();
