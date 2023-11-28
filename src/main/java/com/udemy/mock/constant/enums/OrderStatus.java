@@ -31,6 +31,12 @@ public enum OrderStatus {
     public static boolean isCompleteStatus(Integer code) {
         return Objects.equals(COMPLETED.getCode(), code);
     }
+    public static boolean isCreatedStatus(Integer code) {
+        return Objects.equals(CREATED.getCode(), code);
+    }
+    public static boolean isPaidStatus(Integer code) {
+        return Objects.equals(PAID.getCode(), code);
+    }
 
     public static boolean isCreateStatus(Integer code) {
         return Objects.equals(CREATED.getCode(), code);

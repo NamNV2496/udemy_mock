@@ -1,8 +1,10 @@
 package com.udemy.mock.scheduler;
 
+import com.udemy.mock.entity.Customer;
 import com.udemy.mock.entity.CustomerTotalAmount;
 import com.udemy.mock.entity.ItemHistory;
 import com.udemy.mock.entity.OrderHistory;
+import com.udemy.mock.repository.CustomerRepository;
 import com.udemy.mock.repository.CustomerTotalAmountRepository;
 import com.udemy.mock.repository.ItemHistoryRepository;
 import com.udemy.mock.repository.OrderHistoryRepository;
@@ -20,6 +22,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @EnableScheduling
 @Configuration
@@ -29,22 +32,28 @@ import org.springframework.stereotype.Service;
 public class CalculateTotalNAVScheduler {
 
     private final OrderHistoryRepository orderHistoryRepository;
+    private final CustomerRepository customerRepository;
     private final ItemHistoryRepository itemHistoryRepository;
     private final CustomerTotalAmountRepository customerTotalAmountRepository;
 
     //    @Scheduled(cron = "* 5 5 * * *")
+    @Transactional
     public void jobNav() {
 
-        if (customerTotalAmountRepository.existsByCreationDateAfter(LocalDate.now().atStartOfDay())) {
+        if (customerTotalAmountRepository.existsByLastModifiedDateAfter(LocalDate.now().atStartOfDay())) {
+            log.info("Đã tính toán NAV ngày hôm nay rồi. Không thực hiện lại!");
             return;
         }
         List<CustomerTotalAmount> customerTotalAmountList = customerTotalAmountRepository.findAll();
         Map<Long, CustomerTotalAmount> customerIdMap = customerTotalAmountList.stream()
             .collect(Collectors.toMap(CustomerTotalAmount::getCustomerId, Function.identity()));
         Map<Long, Integer> totalNavTodayOfCustId = this.getTotalNav();
-
         List<CustomerTotalAmount> updateList = this.addTotalToday(totalNavTodayOfCustId, customerIdMap);
-        log.info("Test");
+
+        // update customerRank
+        Map<Long, Integer> totalAmountOfAccount = updateList.stream()
+            .collect(Collectors.toMap(CustomerTotalAmount::getCustomerId, CustomerTotalAmount::getTotal));
+        this.updateRank(totalAmountOfAccount);
         customerTotalAmountRepository.saveAll(updateList);
     }
 
@@ -90,5 +99,96 @@ public class CalculateTotalNAVScheduler {
             }
         }
         return updateList;
+    }
+
+    @Transactional
+    public void jobNavWay2() {
+
+        if (customerTotalAmountRepository.existsByLastModifiedDateAfter(LocalDate.now().atStartOfDay())) {
+            log.info("Đã tính toán NAV ngày hôm nay rồi. Không thực hiện lại!");
+            return;
+        }
+        List<CustomerTotalAmount> customerTotalAmountList = customerTotalAmountRepository.findAll();
+        Map<Long, CustomerTotalAmount> customerIdMap = customerTotalAmountList.stream()
+            .collect(Collectors.toMap(CustomerTotalAmount::getCustomerId, Function.identity()));
+
+        List<CustomerTotalAmount> updateList = this.calculateTotalAmountAccountQueryNative(customerIdMap);
+        customerTotalAmountRepository.saveAll(updateList);
+    }
+
+    public List<CustomerTotalAmount> calculateTotalAmountAccountQueryNative(
+        Map<Long, CustomerTotalAmount> customerIdMap) {
+
+        List<CustomerTotalAmount> updateList = new ArrayList<>();
+        Map<Long, Integer> totalAmountOfAccount = new HashMap<>();
+
+        List<Map<Object, Object>> returnMap = customerTotalAmountRepository.getTotalAmount();
+
+        returnMap.forEach(map -> {
+            log.info("key: {} value: {}", map.get("id"), map.get("total"));
+            long customerId = Long.parseLong(map.get("id").toString());
+            int total = Integer.parseInt(map.get("total").toString());
+            totalAmountOfAccount.put(customerId, total);
+            if (customerIdMap.containsKey(customerId)) {
+                CustomerTotalAmount update = new CustomerTotalAmount();
+                BeanUtils.copyProperties(customerIdMap.get(customerId), update);
+                update.setTotal(total);
+                updateList.add(update);
+            } else {
+                updateList.add(CustomerTotalAmount.builder()
+                    .customerId(customerId)
+                    .total(total)
+                    .build());
+            }
+        });
+        // update customerRank
+        this.updateRank(totalAmountOfAccount);
+        return updateList;
+    }
+
+    private void updateRank(Map<Long, Integer> totalAmountOfAccount) {
+
+        List<Customer> customers = customerRepository.findAll();
+        List<Customer> customerUpdateList = new ArrayList<>();
+        Map<Long, String> listUpgradeRank2 = new HashMap<>();
+        Map<Long, String> listUpgradeRank3 = new HashMap<>();
+
+        Map<Long, Customer> customerMap = customers.stream()
+            .collect(Collectors.toMap(Customer::getId, Function.identity()));
+        for (Map.Entry<Long, Integer> entry : totalAmountOfAccount.entrySet()) {
+            if (entry.getValue() > 1000000
+                && customerMap.get(entry.getKey()).getCustomerRank() != 2) {
+                Customer customerUpdate = new Customer();
+                BeanUtils.copyProperties(customerMap.get(entry.getKey()), customerUpdate);
+                customerUpdate.setCustomerRank(2);
+                customerUpdateList.add(customerUpdate);
+                listUpgradeRank2.put(customerUpdate.getId(), customerUpdate.getUserName());
+            } else if (entry.getValue() > 5000000
+                && customerMap.get(entry.getKey()).getCustomerRank() != 3) {
+                Customer customerUpdate = new Customer();
+                BeanUtils.copyProperties(customerMap.get(entry.getKey()), customerUpdate);
+                customerUpdate.setCustomerRank(3);
+                customerUpdateList.add(customerUpdate);
+                listUpgradeRank3.put(customerUpdate.getId(), customerUpdate.getUserName());
+            }
+        }
+
+        log.info("list of customer upgrade to level 2: {}", listUpgradeRank2);
+        log.info("list of customer upgrade to level 3: {}", listUpgradeRank3);
+        customerRepository.saveAll(customerUpdateList);
+    }
+
+    public Map<Long, Integer> calculateTotalAmountAccountEachDayQueryNative() {
+
+        Map<Long, Integer> ret = new HashMap<>();
+        List<Map<Object, Object>> returnMap = customerTotalAmountRepository.getTotalAmountEachDay();
+
+        returnMap.forEach(map -> {
+            long customerId = Long.parseLong(map.get("id").toString());
+            int total = Integer.parseInt(map.get("total").toString());
+            ret.put(customerId, total);
+        });
+        log.info("NAV each day: {}", ret);
+        return ret;
     }
 }

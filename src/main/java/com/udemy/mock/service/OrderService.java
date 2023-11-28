@@ -67,17 +67,26 @@ public class OrderService {
     @Transactional
     public Boolean updateStatus(Long orderId, Integer status) {
 
-        if (!OrderStatus.isOrderStatus(status)) throw new RuntimeException("Status is illegal");
-        if (OrderStatus.isCreateStatus(status)) throw new RuntimeException("Status is illegal");
+        if (!OrderStatus.isOrderStatus(status)) {
+            throw new RuntimeException("Status is illegal");
+        }
         Optional<Order> orderOptional = orderRepository.findById(orderId);
         List<ItemOrder> itemOrderList = itemOrderRepository.findByOrderId(orderId);
-        if (orderOptional.isEmpty()) throw new RuntimeException("OrderId isn't exist");
+        if (orderOptional.isEmpty()) {
+            throw new RuntimeException("OrderId isn't exist");
+        }
 
         if (Objects.equals(orderOptional.get().getStatus(), status)) {
             return false;
         }
         Order orderUpdate = new Order();
         BeanUtils.copyProperties(orderOptional.get(), orderUpdate);
+        if (!(OrderStatus.isCreatedStatus(orderUpdate.getStatus())
+            && OrderStatus.isPaidStatus(status))
+            || !(OrderStatus.isPaidStatus(orderUpdate.getStatus())
+            && OrderStatus.isCompleteStatus(status))) {
+            throw new RuntimeException("Status is invalid");
+        }
         orderUpdate.setStatus(status);
         orderRepository.save(orderUpdate);
         // if status == COMPLETED -> save orderHistory
